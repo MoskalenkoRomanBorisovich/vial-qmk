@@ -1,6 +1,10 @@
 #include "ergohaven_ruen.h"
 #include "hid.h"
 
+#define HOLD_WAIT_TIME 10
+
+#define DEFAULT_WAIT_TIME 50
+
 static uint8_t cur_lang = LANG_EN;
 
 static uint8_t stored_lang = LANG_EN;
@@ -17,7 +21,11 @@ static bool english_word = false;
 
 static bool mac_layout = false;
 
-void set_lang(uint8_t lang) {
+static bool key_pressed_while_hold = false;
+
+static uint16_t hold_timer = 0;
+
+void set_lang_delay(uint8_t lang, uint16_t wait_) {
     uint8_t mods = get_mods();
     switch (tg_mode) {
         case TG_DEFAULT:
@@ -26,15 +34,15 @@ void set_lang(uint8_t lang) {
             if (keymap_config.swap_lctl_lgui) {
                 register_code(KC_LCTL);
                 tap_code(KC_SPACE);
-                wait_ms(50);
+                wait_ms(wait_);
                 unregister_code(KC_LCTL);
-                wait_ms(50);
+                wait_ms(wait_);
             } else {
                 register_code(KC_LGUI);
                 tap_code(KC_SPACE);
-                wait_ms(50);
+                wait_ms(wait_);
                 unregister_code(KC_LGUI);
-                wait_ms(50);
+                wait_ms(wait_);
             }
             if (mods != 0) add_mods(mods);
             break;
@@ -61,6 +69,10 @@ void set_lang(uint8_t lang) {
             break;
     }
     cur_lang = lang;
+}
+
+void set_lang(uint8_t lang) {
+    set_lang_delay(lang, DEFAULT_WAIT_TIME);
 }
 
 void set_ruen_toggle_mode(uint8_t mode) {
@@ -131,6 +143,8 @@ uint16_t en_table[] = {
 bool pre_process_record_ruen(uint16_t keycode, keyrecord_t *record) {
     if (!record->event.pressed) return true;
 
+    key_pressed_while_hold = true;
+
     switch (keycode) {
         case KC_A ... KC_Z:
         case S(KC_A)... S(KC_Z):
@@ -188,6 +202,30 @@ bool process_russian_letter(uint8_t keycode) {
 }
 
 bool process_record_ruen(uint16_t keycode, keyrecord_t *record) {
+    if (keycode == LMT_EN_4) {
+        
+        if (record->event.pressed) {
+            hold_timer = timer_read();
+            layer_on(4);
+
+            stored_lang = cur_lang;
+            set_lang_delay(LANG_EN, HOLD_WAIT_TIME);
+
+            register_code(KC_RSFT);
+            key_pressed_while_hold = false;
+        } else {
+            unregister_code(KC_RSFT);
+
+            set_lang_delay(stored_lang, HOLD_WAIT_TIME);
+
+            layer_off(4);
+            if (timer_elapsed(hold_timer) < TAPPING_TERM + HOLD_WAIT_TIME * 4 && !key_pressed_while_hold) {
+                tap_code(KC_BSPC);
+            }
+        }
+        return false;
+    }
+
     if (!(LG_START <= keycode && keycode < LG_END)) return true;
 
     if (keycode == LG_MOD) {

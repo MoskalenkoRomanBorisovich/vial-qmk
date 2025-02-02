@@ -62,6 +62,10 @@ enum ruen_custom_keycodes {
 
     // end of ru en symbols range
     LG_END,
+
+    // toggle layer to 4 hold shift and switch to english if needed
+    LMT_EN_4 = SAFE_RANGE
+
 };
 
 enum { LANG_EN = 0, LANG_RU };
